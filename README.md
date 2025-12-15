@@ -56,15 +56,8 @@ LiveStream Extractor是一款Chrome浏览器扩展，用于提取热门直播平
 ### 1. 直播流提取模块
 
 - **抖音直播流提取**：通过多种策略从抖音直播间页面提取直播流URL
-  - 从`window.__RENDER_DATA__`提取
-  - 从`data-config`属性提取
-  - 从`window.__INITIAL_STATE__`提取
-  - 从`self.__pace_f.push`提取
-  - 直接提取所有FLV、HLS和m3u8链接
 
 - **哔哩哔哩直播流提取**：从哔哩哔哩直播间页面提取直播流URL
-  - 从页面中直接搜索`playurl_info`提取直播流数据
-  - 支持多种清晰度、格式和编码
 
 ### 2. 侧边栏管理模块
 
@@ -96,11 +89,6 @@ LiveStream Extractor是一款Chrome浏览器扩展，用于提取热门直播平
 
 ```
 LiveStreamExtractor/
-├── data/                  # 测试数据文件
-│   ├── bilibili.html
-│   ├── bilibili_live_streams.html
-│   ├── douyin.html
-│   └── live_streams.html
 ├── images/                # 扩展图标
 │   ├── icon-128.png
 │   ├── icon-16.png
@@ -129,71 +117,7 @@ LiveStreamExtractor/
 | style.css | 侧边栏的样式设计 |
 | service-worker.js | 扩展的后台脚本，处理扩展的生命周期事件 |
 
-### 开发流程
-
-1. 修改代码
-2. 在`chrome://extensions/`页面点击"更新"按钮刷新扩展
-3. 打开直播页面测试功能
-4. 使用浏览器开发者工具调试
-
-### 测试
-
-项目包含一些测试数据文件，可用于在本地测试提取功能：
-
-- data/douyin.html：抖音直播间测试页面
-- data/bilibili.html：哔哩哔哩直播间测试页面
-
-## 贡献指南
-
-欢迎对本项目进行贡献！如果您有任何想法、建议或发现了bug，请通过以下方式参与：
-
-1. **提交Issue**：如果您发现了bug或有新功能建议，欢迎提交Issue
-2. **提交Pull Request**：如果您想直接贡献代码，请按照以下步骤：
-   - Fork本项目
-   - 创建您的特性分支 (`git checkout -b feature/AmazingFeature`)
-   - 提交您的更改 (`git commit -m 'Add some AmazingFeature'`)
-   - 推送到分支 (`git push origin feature/AmazingFeature`)
-   - 打开Pull Request
-
-### 代码规范
-
-- 遵循JavaScript ES6+语法规范
-- 代码结构清晰，注释完整
-- 变量命名规范，使用有意义的名称
-- 函数功能单一，便于测试和维护
-
-## 许可证信息
-
-本项目采用MIT许可证，详见LICENSE文件。
-
-## 更新日志
-
-### v1.1 (2025-12-15)
-
-- 增加了对抖音直播流的多种提取策略
-- 优化了哔哩哔哩直播流提取逻辑
-- 改进了侧边栏界面设计
-- 增加了详细的流信息展示
-- 支持更多过滤条件
-- 优化了链接测试功能
-
-### v1.0 (2025-12-01)
-
-- 初始版本
-- 支持抖音和哔哩哔哩直播流提取
-- 基本的侧边栏功能
-
-## 联系方式
-
-如有问题或建议，欢迎通过以下方式联系：
-
-- 项目地址：https://github.com/yourusername/LiveStreamExtractor
-- 邮箱：your.email@example.com
 
 ## 免责声明
 
 本扩展仅用于学习和研究目的，请勿用于任何非法用途。使用本扩展提取的直播流链接请遵守相关平台的使用条款和法律法规。
-
----
-
-**LiveStream Extractor** - 让直播流提取变得简单！
