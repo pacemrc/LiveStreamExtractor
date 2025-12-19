@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>直播流聚合控制面板</title>
+  <script src="sidebar.js"></script>
+  <link rel="stylesheet" type="text/css" href="css/style.css">
+</head>
+<body>
+  <!-- 主容器 -->
+  <div class="main-container">
+    <!-- 页面头部 -->
+    <header class="header">
+      <h1 class="header-title">直播流聚合</h1>
+      <div class="header-actions">
+        <button id="refreshBtn" class="btn primary-btn">刷新数据</button>
+      </div>
+    </header>
+
+    <!-- 内容区域 -->
+    <main class="content">
+      <!-- 平台标签页 -->
+      <div class="tabs-container">
+        <div class="tab-buttons">
+          <button class="tab-btn active" data-platform="douyin">抖音</button>
+          <button class="tab-btn" data-platform="bilibili">哔哩哔哩</button>
+        </div>
+        
+        <!-- 抖音平台内容 -->
+        <div id="douyinTab" class="tab-content active">
+          <!-- 直播流链接卡片 -->
+          <section class="card">
+            <div class="card-header">
+              <h2 class="card-title">抖音直播流链接</h2>
+            </div>
+            
+            <div class="card-body">
+              <!-- 过滤控件区域 -->
+              <div class="filter-container">
+                <div class="filter-rows">
+                  <!-- 第一行筛选条件 -->
+                  <div class="filter-row">
+                    <!-- 类型过滤 -->
+                    <div class="filter-group">
+                      <label for="typeFilter-douyin">类型:</label>
+                      <select id="typeFilter-douyin" class="custom-select">
+                        <option value="">所有类型</option>
+                      </select>
+                    </div>
+                    
+                    <!-- 清晰度过滤 -->
+                    <div class="filter-group">
+                      <label for="clarityFilter-douyin">清晰度:</label>
+                      <select id="clarityFilter-douyin" class="custom-select">
+                        <option value="">所有清晰度</option>
+                      </select>
+                    </div>
+                    
+                    <!-- 媒体协议过滤 -->
+                    <div class="filter-group">
+                      <label for="mediaProtocolFilter-douyin">媒体协议:</label>
+                      <select id="mediaProtocolFilter-douyin" class="custom-select">
+                        <option value="">所有协议</option>
+                      </select>
+                    </div>
+                    
+                    <!-- 状态过滤 -->
+                    <div class="filter-group">
+                      <label for="statusFilter-douyin">状态:</label>
+                      <select id="statusFilter-douyin" class="custom-select">
+                        <option value="">所有状态</option>
+                        <option value="success">有效</option>
+                        <option value="error">无效</option>
+                      </select>
+                    </div>
+                  </div>
+                  
+                  <!-- 操作按钮组 -->
+                  <div class="filter-row">
+                    <div class="filter-group action-buttons">
+                      <button id="resetFiltersBtn-douyin" class="btn reset-btn">重置筛选</button>
+                      <button id="copyAllStreamsBtn-douyin" class="btn copy-btn">一键复制</button>
+                      <button id="testAllLinksBtn-douyin" class="btn test-all-btn">一键测试</button>
+
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- 活动筛选指示器 -->
+                <div id="activeFilters-douyin" class="active-filters"></div>
+              </div>
+              
+              <!-- 直播流表格 -->
+              <div class="table-container">
+                <table id="dynamicTable-douyin" class="table">
+                  <thead class="table-header">
+                    <tr>
+                      <th>类型</th>
+                      <th>清晰度</th>
+                      <th>媒体协议</th>
+                      <th>链接状态</th>
+                      <th>操作</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tableBody-douyin"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+        </div>
+        
+        <!-- 哔哩哔哩平台内容 -->
+        <div id="bilibiliTab" class="tab-content">
+          <!-- 直播流链接卡片 -->
+          <section class="card">
+            <div class="card-header">
+              <h2 class="card-title">哔哩哔哩直播流链接</h2>
+            </div>
+            
+            <div class="card-body">
+              <!-- 过滤控件区域 -->
+              <div class="filter-container">
+                <div class="filter-rows">
+                  <!-- 第一行筛选条件 -->
+                  <div class="filter-row">
+                    <!-- 类型过滤 -->
+                    <div class="filter-group">
+                      <label for="typeFilter-bilibili">类型:</label>
+                      <select id="typeFilter-bilibili" class="custom-select">
+                        <option value="">所有类型</option>
+                      </select>
+                    </div>
+                    
+                    <!-- 清晰度过滤 -->
+                    <div class="filter-group">
+                      <label for="clarityFilter-bilibili">清晰度:</label>
+                      <select id="clarityFilter-bilibili" class="custom-select">
+                        <option value="">所有清晰度</option>
+                      </select>
+                    </div>
+                    
+                    <!-- 媒体协议过滤 -->
+                    <div class="filter-group">
+                      <label for="mediaProtocolFilter-bilibili">媒体协议:</label>
+                      <select id="mediaProtocolFilter-bilibili" class="custom-select">
+                        <option value="">所有协议</option>
+                      </select>
+                    </div>
+                    
+                    <!-- 视频编码过滤 -->
+                    <div class="filter-group">
+                      <label for="codecFilter-bilibili">视频编码:</label>
+                      <select id="codecFilter-bilibili" class="custom-select">
+                        <option value="">所有编码</option>
+                      </select>
+                    </div>
+                    
+                    <!-- 状态过滤 -->
+                    <div class="filter-group">
+                      <label for="statusFilter-bilibili">状态:</label>
+                      <select id="statusFilter-bilibili" class="custom-select">
+                        <option value="">所有状态</option>
+                        <option value="success">有效</option>
+                        <option value="error">无效</option>
+                      </select>
+                    </div>
+                  </div>
+                  
+                  <!-- 操作按钮组 -->
+                  <div class="filter-row">
+                    <div class="filter-group action-buttons">
+                      <button id="resetFiltersBtn-bilibili" class="btn reset-btn">重置筛选</button>
+                      <button id="copyAllStreamsBtn-bilibili" class="btn copy-btn">一键复制</button>
+                      <button id="testAllLinksBtn-bilibili" class="btn test-all-btn">一键测试</button>
+
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- 活动筛选指示器 -->
+                <div id="activeFilters-bilibili" class="active-filters"></div>
+              </div>
+              
+              <!-- 直播流表格 -->
+              <div class="table-container">
+                <table id="dynamicTable-bilibili" class="table">
+                  <thead class="table-header">
+                    <tr>
+                      <th>类型</th>
+                      <th>清晰度</th>
+                      <th>媒体协议</th>
+                      <th>视频编码</th>
+                      <th>链接状态</th>
+                      <th>操作</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tableBody-bilibili"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </main>
+  </div>
+
+
+</body>
+</html>
+

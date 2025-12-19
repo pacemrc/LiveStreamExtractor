@@ -1,13 +1,13 @@
 // 直播流管理功能
 class StreamManager {
-    constructor() {
+    constructor(platform) {
+        this.platform = platform;
         this.init();
     }
 
     // 初始化
     async init() {
         this.bindEvents();
-        this.setupLiveStreamExtraction();
     }
 
     // 绑定事件
@@ -17,6 +17,98 @@ class StreamManager {
         
         // 添加过滤控件事件
         this.setupFilterControls();
+        
+        // 添加一键复制按钮事件
+        this.setupCopyAllStreamsButton();
+    }
+    
+    // 添加一键复制按钮事件监听
+    setupCopyAllStreamsButton() {
+        const copyBtn = document.getElementById(`copyAllStreamsBtn-${this.platform}`);
+        if (copyBtn) {
+            copyBtn.addEventListener('click', () => this.copyAllLiveStreams());
+        }
+    }
+    
+    // 一键复制
+    async copyAllLiveStreams() {
+        try {
+            const copyBtn = document.getElementById(`copyAllStreamsBtn-${this.platform}`);
+            const originalText = copyBtn.textContent;
+            
+            // 确保有流数据
+            if (!this.filteredStreams || this.filteredStreams.length === 0) {
+                copyBtn.textContent = '无数据可复制';
+                copyBtn.style.background = 'linear-gradient(135deg, #f6e05e 0%, #d69e2e 100%)';
+                showNotification('没有可复制的直播流链接', 'error');
+                
+                setTimeout(() => {
+                    copyBtn.textContent = originalText;
+                    copyBtn.style.background = '';
+                }, 2000);
+                return;
+            }
+            
+            // 格式化直播流链接，一个URL一行
+            const streamsText = this.filteredStreams.map(stream => stream.url).join('\n');
+            
+            try {
+                // 尝试使用Clipboard API复制
+                await navigator.clipboard.writeText(streamsText);
+                
+                // 显示成功反馈
+                copyBtn.textContent = '复制成功';
+                copyBtn.style.background = 'linear-gradient(135deg, #48bb78 0%, #38a169 100%)';
+                
+                // 显示通知
+                showNotification(`已成功复制 ${this.filteredStreams.length} 个直播流链接到剪贴板`);
+            } catch (clipboardError) {
+                console.error('Clipboard API复制失败:', clipboardError);
+                
+                // 降级方案：使用textarea复制
+                try {
+                    const textArea = document.createElement('textarea');
+                    textArea.value = streamsText;
+                    textArea.style.position = 'fixed';
+                    textArea.style.opacity = '0';
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                    
+                    // 显示成功反馈
+                    copyBtn.textContent = '复制成功';
+                    copyBtn.style.background = 'linear-gradient(135deg, #48bb78 0%, #38a169 100%)';
+                    
+                    // 显示通知
+                    showNotification(`已成功复制 ${this.filteredStreams.length} 个直播流链接到剪贴板`);
+                } catch (fallbackError) {
+                    console.error('降级复制方案失败:', fallbackError);
+                    
+                    // 显示失败反馈
+                    copyBtn.textContent = '复制失败';
+                    copyBtn.style.background = 'linear-gradient(135deg, #f56565 0%, #e53e3e 100%)';
+                    
+                    // 显示失败通知
+                    showNotification('复制失败，请手动复制链接', 'error');
+                    
+                    // 提供手动复制选项
+                    const shouldOpenPrompt = confirm(`复制失败，是否显示 ${this.filteredStreams.length} 个链接以便手动复制？`);
+                    if (shouldOpenPrompt) {
+                        prompt(`请手动复制 ${this.filteredStreams.length} 个链接:`, streamsText);
+                    }
+                }
+            } finally {
+                // 恢复按钮原始状态
+                setTimeout(() => {
+                    copyBtn.textContent = originalText;
+                    copyBtn.style.background = '';
+                }, 2000);
+            }
+        } catch (error) {
+            console.error('一键复制失败:', error);
+            showNotification('复制失败，请手动复制链接', 'error');
+        }
     }
     
     // 添加刷新按钮事件监听
@@ -24,7 +116,9 @@ class StreamManager {
         const refreshBtn = document.getElementById('refreshBtn');
         if (refreshBtn) {
             refreshBtn.addEventListener('click', () => {
-                this.refreshLiveStreamData();
+                // 只刷新当前活动标签页的数据
+                const activePlatform = document.querySelector('.tab-btn.active').dataset.platform;
+                streamManagers[activePlatform].refreshLiveStreamData();
             });
         }
     }
@@ -32,7 +126,7 @@ class StreamManager {
     // 刷新直播流数据
     refreshLiveStreamData() {
         // 清空动态表格
-        const tableBody = document.querySelector("#dynamicTable tbody");
+        const tableBody = document.querySelector(`#dynamicTable-${this.platform} tbody`);
         if (tableBody) {
             tableBody.innerHTML = '';
         }
@@ -41,13 +135,13 @@ class StreamManager {
         this.setupLiveStreamExtraction();
         
         // 显示刷新提示
-        showNotification('正在刷新数据...');
+        showNotification(`正在刷新${this.platform === 'douyin' ? '抖音' : '哔哩哔哩'}数据...`);
     }
 
     // 设置直播流提取
     setupLiveStreamExtraction() {
         // 清空表格
-        const tableBody = document.querySelector("#dynamicTable tbody");
+        const tableBody = document.querySelector(`#dynamicTable-${this.platform} tbody`);
         if (tableBody) {
             tableBody.innerHTML = '';
         }
@@ -56,7 +150,8 @@ class StreamManager {
         if (tableBody) {
             const loadingRow = document.createElement("tr");
             const loadingCell = document.createElement("td");
-            loadingCell.colSpan = 4;
+            const colSpan = this.platform === 'douyin' ? 5 : 6;
+            loadingCell.colSpan = colSpan;
             loadingCell.textContent = "正在提取直播流链接...";
             loadingCell.style.textAlign = "center";
             loadingRow.appendChild(loadingCell);
@@ -68,7 +163,7 @@ class StreamManager {
             if (!tabs || tabs.length === 0) {
                 console.error("未找到活动标签页");
                 if (tableBody) {
-                tableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: red;">未找到活动标签页</td></tr>';
+                tableBody.innerHTML = `<tr><td colspan="${this.platform === 'douyin' ? 5 : 6}" style="text-align: center; color: red;">未找到活动标签页</td></tr>`;
             }
                 return;
             }
@@ -77,17 +172,18 @@ class StreamManager {
             if (!activeTab || !activeTab.id) {
                 console.error("活动标签页无效");
                 if (tableBody) {
-                tableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: red;">活动标签页无效</td></tr>';
+                tableBody.innerHTML = `<tr><td colspan="${this.platform === 'douyin' ? 5 : 6}" style="text-align: center; color: red;">活动标签页无效</td></tr>`;
             }
                 return;
             }
             
             // 发送消息，移除自动重试机制
-            chrome.tabs.sendMessage(activeTab.id, { action: "extractLiveList" }, (response) => {
+            const action = this.platform === 'douyin' ? "extractDyLiveList" : "extractLiveList";
+            chrome.tabs.sendMessage(activeTab.id, { action: action }, (response) => {
                 if (chrome.runtime.lastError) {
 
                     if (tableBody) {
-                        tableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: red;">提取直播流链接失败，请点击刷新按钮重试</td></tr>';
+                        tableBody.innerHTML = `<tr><td colspan="${this.platform === 'douyin' ? 5 : 6}" style="text-align: center; color: red;">提取直播流链接失败，请点击刷新按钮重试</td></tr>`;
                     }
                     return;
                 }
@@ -107,8 +203,13 @@ class StreamManager {
                 const isStructuredData = validResponse.length > 0 && typeof validResponse[0] === 'object';
                 
                 if (isStructuredData) {
-                    // 处理结构化流数据
-                    allStreamsData = validResponse.filter(stream => stream && stream.url && stream.url !== '-');
+                    // 处理结构化流数据，过滤掉其他平台的数据
+                    allStreamsData = validResponse.filter(stream => 
+                        stream && stream.url && stream.url !== '-' && 
+                        (stream.platform.toLowerCase() === this.platform || 
+                         (this.platform === 'douyin' && stream.platform === '抖音') ||
+                         (this.platform === 'bilibili' && stream.platform === '哔哩哔哩'))
+                    );
                 } else {
                     // 处理旧格式数据（兼容）
                     for (let i = 0; i < validResponse.length; i += 2) {
@@ -147,7 +248,7 @@ class StreamManager {
             } else {
                 // 没有返回数据，显示提示
                 if (tableBody) {
-                    tableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: red;">未提取到直播流链接</td></tr>';
+                    tableBody.innerHTML = `<tr><td colspan="${this.platform === 'douyin' ? 5 : 6}" style="text-align: center; color: red;">未提取到直播流链接</td></tr>`;
                 }
             }
             });
@@ -161,55 +262,43 @@ class StreamManager {
         this.allStreams = [];
         
         // 类型过滤
-        const typeFilter = document.getElementById('typeFilter');
+        const typeFilter = document.getElementById(`typeFilter-${this.platform}`);
         if (typeFilter) {
             typeFilter.addEventListener('change', () => this.applyFilters());
         }
         
         // 清晰度过滤
-        const clarityFilter = document.getElementById('clarityFilter');
+        const clarityFilter = document.getElementById(`clarityFilter-${this.platform}`);
         if (clarityFilter) {
             clarityFilter.addEventListener('change', () => this.applyFilters());
         }
         
-        // 格式过滤
-        const formatFilter = document.getElementById('formatFilter');
-        if (formatFilter) {
-            formatFilter.addEventListener('change', () => this.applyFilters());
+        // 媒体协议过滤
+        const mediaProtocolFilter = document.getElementById(`mediaProtocolFilter-${this.platform}`);
+        if (mediaProtocolFilter) {
+            mediaProtocolFilter.addEventListener('change', () => this.applyFilters());
         }
         
         // 视频编码过滤
-        const codecFilter = document.getElementById('codecFilter');
+        const codecFilter = document.getElementById(`codecFilter-${this.platform}`);
         if (codecFilter) {
             codecFilter.addEventListener('change', () => this.applyFilters());
         }
         
-        // HDR类型过滤
-        const hdrFilter = document.getElementById('hdrFilter');
-        if (hdrFilter) {
-            hdrFilter.addEventListener('change', () => this.applyFilters());
-        }
-        
-        // 码率过滤
-        const bitrateFilter = document.getElementById('bitrateFilter');
-        if (bitrateFilter) {
-            bitrateFilter.addEventListener('change', () => this.applyFilters());
-        }
-        
-        // 分辨率过滤
-        const resolutionFilter = document.getElementById('resolutionFilter');
-        if (resolutionFilter) {
-            resolutionFilter.addEventListener('change', () => this.applyFilters());
+        // 状态过滤
+        const statusFilter = document.getElementById(`statusFilter-${this.platform}`);
+        if (statusFilter) {
+            statusFilter.addEventListener('change', () => this.applyFilters());
         }
         
         // 重置筛选按钮
-        const resetBtn = document.getElementById('resetFiltersBtn');
+        const resetBtn = document.getElementById(`resetFiltersBtn-${this.platform}`);
         if (resetBtn) {
             resetBtn.addEventListener('click', () => this.resetFilters());
         }
         
-        // 一键测试所有链接按钮
-        const testAllBtn = document.getElementById('testAllLinksBtn');
+        // 一键测试按钮
+        const testAllBtn = document.getElementById(`testAllLinksBtn-${this.platform}`);
         if (testAllBtn) {
             testAllBtn.addEventListener('click', () => this.testAllLinks());
         }
@@ -219,15 +308,11 @@ class StreamManager {
     updateFilterOptions() {
         // 收集所有唯一值并排序
         const types = [...new Set(this.allStreams.map(stream => stream.type))].sort();
-        const clarities = [...new Set(this.allStreams.map(stream => stream.quality))].sort();
-        const formats = [...new Set(this.allStreams.map(stream => stream.format))].sort();
+        const mediaProtocols = [...new Set(this.allStreams.map(stream => stream.mediaProtocol))].sort();
         const codecs = [...new Set(this.allStreams.map(stream => stream.codec))].sort();
-        const hdrTypes = [...new Set(this.allStreams.map(stream => stream.hdrType))].sort();
-        const bitrates = [...new Set(this.allStreams.map(stream => stream.bitrate))].sort();
-        const resolutions = [...new Set(this.allStreams.map(stream => stream.resolution))].sort();
         
         // 更新类型过滤选项
-        const typeFilter = document.getElementById('typeFilter');
+        const typeFilter = document.getElementById(`typeFilter-${this.platform}`);
         if (typeFilter) {
             // 清空现有选项（保留第一个"所有类型"选项）
             while (typeFilter.options.length > 1) {
@@ -253,12 +338,42 @@ class StreamManager {
         }
         
         // 更新清晰度过滤选项
-        const clarityFilter = document.getElementById('clarityFilter');
+        const clarityFilter = document.getElementById(`clarityFilter-${this.platform}`);
         if (clarityFilter) {
             // 清空现有选项（保留第一个"所有清晰度"选项）
             while (clarityFilter.options.length > 1) {
                 clarityFilter.remove(1);
             }
+            
+            // 动态收集所有清晰度选项，包括抖音平台
+            let clarities = [...new Set(this.allStreams.map(stream => stream.quality))].sort();
+            
+            // 清晰度优先级排序（标清 < 高清 < 超清 < 蓝光 < 原画 < 其他）
+            const qualityPriority = {
+                '标清': 1,
+                '高清': 2,
+                '超清': 3,
+                '蓝光': 4,
+                '原画': 5
+            };
+            
+            // 按照优先级排序
+            clarities.sort((a, b) => {
+                // 如果a和b都在优先级列表中，按照优先级排序
+                if (qualityPriority[a] && qualityPriority[b]) {
+                    return qualityPriority[a] - qualityPriority[b];
+                }
+                // 如果只有a在优先级列表中，a排在前面
+                if (qualityPriority[a]) {
+                    return -1;
+                }
+                // 如果只有b在优先级列表中，b排在前面
+                if (qualityPriority[b]) {
+                    return 1;
+                }
+                // 如果都不在优先级列表中，按照字母顺序排序
+                return a.localeCompare(b, 'zh-CN');
+            });
             
             // 添加新选项
             clarities.forEach(clarity => {
@@ -278,24 +393,24 @@ class StreamManager {
             });
         }
         
-        // 更新格式过滤选项
-        const formatFilter = document.getElementById('formatFilter');
-        if (formatFilter) {
-            // 清空现有选项（保留第一个"所有格式"选项）
-            while (formatFilter.options.length > 1) {
-                formatFilter.remove(1);
+        // 更新媒体协议过滤选项
+        const mediaProtocolFilter = document.getElementById(`mediaProtocolFilter-${this.platform}`);
+        if (mediaProtocolFilter) {
+            // 清空现有选项（保留第一个"所有协议"选项）
+            while (mediaProtocolFilter.options.length > 1) {
+                mediaProtocolFilter.remove(1);
             }
             
             // 添加新选项
-            formats.forEach(format => {
+            mediaProtocols.forEach(mediaProtocol => {
                 const option = document.createElement('option');
-                option.value = format;
-                option.textContent = format;
+                option.value = mediaProtocol;
+                option.textContent = mediaProtocol;
                 // 添加选项时添加淡入动画
                 option.style.opacity = '0';
                 option.style.transform = 'translateY(-5px)';
                 option.style.transition = 'opacity 0.2s ease, transform 0.2s ease';
-                formatFilter.appendChild(option);
+                mediaProtocolFilter.appendChild(option);
                 // 触发重排后设置最终样式
                 setTimeout(() => {
                     option.style.opacity = '1';
@@ -305,7 +420,7 @@ class StreamManager {
         }
         
         // 更新视频编码过滤选项
-        const codecFilter = document.getElementById('codecFilter');
+        const codecFilter = document.getElementById(`codecFilter-${this.platform}`);
         if (codecFilter) {
             // 清空现有选项（保留第一个"所有编码"选项）
             while (codecFilter.options.length > 1) {
@@ -329,84 +444,6 @@ class StreamManager {
                 }, 10);
             });
         }
-        
-        // 更新HDR类型过滤选项
-        const hdrFilter = document.getElementById('hdrFilter');
-        if (hdrFilter) {
-            // 清空现有选项（保留第一个"所有HDR类型"选项）
-            while (hdrFilter.options.length > 1) {
-                hdrFilter.remove(1);
-            }
-            
-            // 添加新选项
-            hdrTypes.forEach(hdrType => {
-                const option = document.createElement('option');
-                option.value = hdrType;
-                option.textContent = hdrType;
-                // 添加选项时添加淡入动画
-                option.style.opacity = '0';
-                option.style.transform = 'translateY(-5px)';
-                option.style.transition = 'opacity 0.2s ease, transform 0.2s ease';
-                hdrFilter.appendChild(option);
-                // 触发重排后设置最终样式
-                setTimeout(() => {
-                    option.style.opacity = '1';
-                    option.style.transform = 'translateY(0)';
-                }, 10);
-            });
-        }
-        
-        // 更新码率过滤选项
-        const bitrateFilter = document.getElementById('bitrateFilter');
-        if (bitrateFilter) {
-            // 清空现有选项（保留第一个"所有码率"选项）
-            while (bitrateFilter.options.length > 1) {
-                bitrateFilter.remove(1);
-            }
-            
-            // 添加新选项
-            bitrates.forEach(bitrate => {
-                const option = document.createElement('option');
-                option.value = bitrate;
-                option.textContent = bitrate;
-                // 添加选项时添加淡入动画
-                option.style.opacity = '0';
-                option.style.transform = 'translateY(-5px)';
-                option.style.transition = 'opacity 0.2s ease, transform 0.2s ease';
-                bitrateFilter.appendChild(option);
-                // 触发重排后设置最终样式
-                setTimeout(() => {
-                    option.style.opacity = '1';
-                    option.style.transform = 'translateY(0)';
-                }, 10);
-            });
-        }
-        
-        // 更新分辨率过滤选项
-        const resolutionFilter = document.getElementById('resolutionFilter');
-        if (resolutionFilter) {
-            // 清空现有选项（保留第一个"所有分辨率"选项）
-            while (resolutionFilter.options.length > 1) {
-                resolutionFilter.remove(1);
-            }
-            
-            // 添加新选项
-            resolutions.forEach(resolution => {
-                const option = document.createElement('option');
-                option.value = resolution;
-                option.textContent = resolution;
-                // 添加选项时添加淡入动画
-                option.style.opacity = '0';
-                option.style.transform = 'translateY(-5px)';
-                option.style.transition = 'opacity 0.2s ease, transform 0.2s ease';
-                resolutionFilter.appendChild(option);
-                // 触发重排后设置最终样式
-                setTimeout(() => {
-                    option.style.opacity = '1';
-                    option.style.transform = 'translateY(0)';
-                }, 10);
-            });
-        }
     }
     
     // 应用过滤
@@ -414,7 +451,7 @@ class StreamManager {
         let filtered = [...this.allStreams];
         
         // 类型过滤
-        const typeFilter = document.getElementById('typeFilter');
+        const typeFilter = document.getElementById(`typeFilter-${this.platform}`);
         if (typeFilter) {
             const selectedType = typeFilter.value;
             if (selectedType) {
@@ -423,7 +460,7 @@ class StreamManager {
         }
         
         // 清晰度过滤
-        const clarityFilter = document.getElementById('clarityFilter');
+        const clarityFilter = document.getElementById(`clarityFilter-${this.platform}`);
         if (clarityFilter) {
             const selectedClarity = clarityFilter.value;
             if (selectedClarity) {
@@ -431,17 +468,17 @@ class StreamManager {
             }
         }
         
-        // 格式过滤
-        const formatFilter = document.getElementById('formatFilter');
-        if (formatFilter) {
-            const selectedFormat = formatFilter.value;
-            if (selectedFormat) {
-                filtered = filtered.filter(stream => stream.format && stream.format === selectedFormat);
+        // 媒体协议过滤
+        const mediaProtocolFilter = document.getElementById(`mediaProtocolFilter-${this.platform}`);
+        if (mediaProtocolFilter) {
+            const selectedMediaProtocol = mediaProtocolFilter.value;
+            if (selectedMediaProtocol) {
+                filtered = filtered.filter(stream => stream.mediaProtocol && stream.mediaProtocol === selectedMediaProtocol);
             }
         }
         
         // 视频编码过滤
-        const codecFilter = document.getElementById('codecFilter');
+        const codecFilter = document.getElementById(`codecFilter-${this.platform}`);
         if (codecFilter) {
             const selectedCodec = codecFilter.value;
             if (selectedCodec) {
@@ -449,32 +486,12 @@ class StreamManager {
             }
         }
         
-        // HDR类型过滤
-        const hdrFilter = document.getElementById('hdrFilter');
-        if (hdrFilter) {
-            const selectedHdrType = hdrFilter.value;
-            if (selectedHdrType) {
-                filtered = filtered.filter(stream => stream.hdrType && stream.hdrType === selectedHdrType);
-            }
-        }
-        
-        // 码率过滤
-        const bitrateFilter = document.getElementById('bitrateFilter');
-        if (bitrateFilter) {
-            const selectedBitrate = bitrateFilter.value;
-            if (selectedBitrate) {
-                // 转换为数字进行比较，因为stream.bitrate是数字类型，selectedBitrate是字符串类型
-                const bitrateValue = parseInt(selectedBitrate);
-                filtered = filtered.filter(stream => typeof stream.bitrate === 'number' && stream.bitrate === bitrateValue);
-            }
-        }
-        
-        // 分辨率过滤
-        const resolutionFilter = document.getElementById('resolutionFilter');
-        if (resolutionFilter) {
-            const selectedResolution = resolutionFilter.value;
-            if (selectedResolution) {
-                filtered = filtered.filter(stream => stream.resolution && stream.resolution === selectedResolution);
+        // 状态过滤
+        const statusFilter = document.getElementById(`statusFilter-${this.platform}`);
+        if (statusFilter) {
+            const selectedStatus = statusFilter.value;
+            if (selectedStatus) {
+                filtered = filtered.filter(stream => stream.status && stream.status === selectedStatus);
             }
         }
         
@@ -482,7 +499,7 @@ class StreamManager {
         this.filteredStreams = filtered;
         
         // 添加表格过渡动画
-        const table = document.getElementById('dynamicTable');
+        const table = document.getElementById(`dynamicTable-${this.platform}`);
         if (table) {
             table.style.opacity = '0.6';
             table.style.transform = 'translateY(5px)';
@@ -507,7 +524,7 @@ class StreamManager {
     // 重置过滤
     resetFilters() {
         // 重置所有过滤控件
-        const filters = ['typeFilter', 'clarityFilter', 'formatFilter', 'codecFilter', 'hdrFilter', 'bitrateFilter', 'resolutionFilter'];
+        const filters = [`typeFilter-${this.platform}`, `clarityFilter-${this.platform}`, `mediaProtocolFilter-${this.platform}`, `codecFilter-${this.platform}`, `statusFilter-${this.platform}`];
         filters.forEach(filterId => {
             const filter = document.getElementById(filterId);
             if (filter) {
@@ -532,7 +549,7 @@ class StreamManager {
         this.filteredStreams = [...this.allStreams];
         
         // 添加表格过渡动画
-        const table = document.getElementById('dynamicTable');
+        const table = document.getElementById(`dynamicTable-${this.platform}`);
         if (table) {
             table.style.opacity = '0.6';
             table.style.transform = 'translateY(5px)';
@@ -554,10 +571,10 @@ class StreamManager {
         this.updateActiveFilters();
         
         // 显示重置成功提示
-        showNotification('筛选条件已重置');
+        showNotification(`${this.platform === 'douyin' ? '抖音' : '哔哩哔哩'}筛选条件已重置`);
     }
     
-    // 一键测试所有链接
+    // 一键测试
     testAllLinks() {
         if (this.filteredStreams.length === 0) {
             showNotification('没有可测试的直播流链接', 'error');
@@ -614,52 +631,43 @@ class StreamManager {
     
     // 更新活动筛选指示器
     updateActiveFilters() {
-        const activeFiltersDiv = document.getElementById('activeFilters');
+        const activeFiltersDiv = document.getElementById(`activeFilters-${this.platform}`);
         if (!activeFiltersDiv) return;
         
         // 收集所有选中的过滤条件
         const activeFilters = [];
         
         // 类型过滤
-        const typeFilter = document.getElementById('typeFilter');
+        const typeFilter = document.getElementById(`typeFilter-${this.platform}`);
         if (typeFilter && typeFilter.value) {
             activeFilters.push(`类型: ${typeFilter.value}`);
         }
         
         // 清晰度过滤
-        const clarityFilter = document.getElementById('clarityFilter');
+        const clarityFilter = document.getElementById(`clarityFilter-${this.platform}`);
         if (clarityFilter && clarityFilter.value) {
             activeFilters.push(`清晰度: ${clarityFilter.value}`);
         }
         
-        // 格式过滤
-        const formatFilter = document.getElementById('formatFilter');
-        if (formatFilter && formatFilter.value) {
-            activeFilters.push(`格式: ${formatFilter.value}`);
+        // 媒体协议过滤
+        const mediaProtocolFilter = document.getElementById(`mediaProtocolFilter-${this.platform}`);
+        if (mediaProtocolFilter && mediaProtocolFilter.value) {
+            activeFilters.push(`媒体协议: ${mediaProtocolFilter.value}`);
         }
         
-        // 视频编码过滤
-        const codecFilter = document.getElementById('codecFilter');
-        if (codecFilter && codecFilter.value) {
-            activeFilters.push(`视频编码: ${codecFilter.value}`);
+        // 状态过滤
+        const statusFilter = document.getElementById(`statusFilter-${this.platform}`);
+        if (statusFilter && statusFilter.value) {
+            const statusText = statusFilter.value === 'success' ? '有效' : '无效';
+            activeFilters.push(`状态: ${statusText}`);
         }
         
-        // HDR类型过滤
-        const hdrFilter = document.getElementById('hdrFilter');
-        if (hdrFilter && hdrFilter.value) {
-            activeFilters.push(`HDR类型: ${hdrFilter.value}`);
-        }
-        
-        // 码率过滤
-        const bitrateFilter = document.getElementById('bitrateFilter');
-        if (bitrateFilter && bitrateFilter.value) {
-            activeFilters.push(`码率: ${bitrateFilter.value}`);
-        }
-        
-        // 分辨率过滤
-        const resolutionFilter = document.getElementById('resolutionFilter');
-        if (resolutionFilter && resolutionFilter.value) {
-            activeFilters.push(`分辨率: ${resolutionFilter.value}`);
+        // 视频编码过滤（仅哔哩哔哩显示）
+        if (this.platform === 'bilibili') {
+            const codecFilter = document.getElementById(`codecFilter-${this.platform}`);
+            if (codecFilter && codecFilter.value) {
+                activeFilters.push(`视频编码: ${codecFilter.value}`);
+            }
         }
         
         // 更新显示
@@ -674,7 +682,7 @@ class StreamManager {
     
     // 显示过滤后的流
     displayFilteredStreams() {
-        const tableBody = document.querySelector("#dynamicTable tbody");
+        const tableBody = document.querySelector(`#dynamicTable-${this.platform} tbody`);
         if (!tableBody) return;
         
         // 清空表格
@@ -683,7 +691,8 @@ class StreamManager {
         if (this.filteredStreams.length === 0) {
             const emptyRow = document.createElement('tr');
             const emptyCell = document.createElement('td');
-            emptyCell.colSpan = 9;
+            const colSpan = this.platform === 'douyin' ? 5 : 6;
+            emptyCell.colSpan = colSpan;
             emptyCell.textContent = '没有符合条件的直播流链接';
             emptyCell.style.textAlign = 'center';
             emptyRow.appendChild(emptyCell);
@@ -707,30 +716,17 @@ class StreamManager {
                 qualityCell.textContent = stream.quality || '--';
                 row.appendChild(qualityCell);
                 
-                // 格式列
-                const formatCell = document.createElement("td");
-                formatCell.textContent = stream.format || '--';
-                row.appendChild(formatCell);
+                // 媒体协议列
+                const mediaProtocolCell = document.createElement("td");
+                mediaProtocolCell.textContent = stream.mediaProtocol || '--';
+                row.appendChild(mediaProtocolCell);
                 
-                // 视频编码列
-                const codecCell = document.createElement("td");
-                codecCell.textContent = stream.codec || '--';
-                row.appendChild(codecCell);
-                
-                // HDR类型列
-                const hdrCell = document.createElement("td");
-                hdrCell.textContent = stream.hdrType || '--';
-                row.appendChild(hdrCell);
-                
-                // 码率列
-                const bitrateCell = document.createElement("td");
-                bitrateCell.textContent = stream.bitrate || '--';
-                row.appendChild(bitrateCell);
-                
-                // 分辨率列
-                const resolutionCell = document.createElement("td");
-                resolutionCell.textContent = stream.resolution || '--';
-                row.appendChild(resolutionCell);
+                // 视频编码列（仅哔哩哔哩显示）
+                if (this.platform === 'bilibili') {
+                    const codecCell = document.createElement("td");
+                    codecCell.textContent = stream.codec || '--';
+                    row.appendChild(codecCell);
+                }
                 
                 // 链接状态列
                 const statusCell = document.createElement("td");
@@ -862,40 +858,49 @@ class StreamManager {
             }
         });
         
-        // 更新表格中的状态显示
-        const statusCells = document.querySelectorAll('.status-cell');
-        statusCells.forEach(cell => {
-            if (cell.dataset.streamUrl === url) {
-                // 添加淡出动画效果
-                cell.style.opacity = '0';
-                cell.style.transform = 'scale(0.9)';
-                
-                // 短暂延迟后更新内容并添加淡入效果
-                setTimeout(() => {
-                    if (status === 'success') {
-                        cell.innerHTML = '<span class="status-dot green" title="有效"></span>';
-                    } else if (status === 'error') {
-                        cell.innerHTML = '<span class="status-dot red" title="无效"></span>';
-                    } else if (status === 'testing') {
-                        cell.innerHTML = '<span class="status-dot testing" title="测试中"></span>';
-                    } else {
-                        cell.innerHTML = '<span class="status-dot gray" title="未测试"></span>';
-                    }
+        // 更新表格中的状态显示，只更新当前平台的表格
+        const tableBody = document.querySelector(`#dynamicTable-${this.platform} tbody`);
+        if (tableBody) {
+            const statusCells = tableBody.querySelectorAll('.status-cell');
+            statusCells.forEach(cell => {
+                if (cell.dataset.streamUrl === url) {
+                    // 添加淡出动画效果
+                    cell.style.opacity = '0';
+                    cell.style.transform = 'scale(0.9)';
                     
-                    // 应用淡入动画
-                    cell.style.transition = 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
-                    cell.style.opacity = '1';
-                    cell.style.transform = 'scale(1)';
-                }, 150);
-            }
-        });
+                    // 短暂延迟后更新内容并添加淡入效果
+                    setTimeout(() => {
+                        if (status === 'success') {
+                            cell.innerHTML = '<span class="status-dot green" title="有效"></span>';
+                        } else if (status === 'error') {
+                            cell.innerHTML = '<span class="status-dot red" title="无效"></span>';
+                        } else if (status === 'testing') {
+                            cell.innerHTML = '<span class="status-dot testing" title="测试中"></span>';
+                        } else {
+                            cell.innerHTML = '<span class="status-dot gray" title="未测试"></span>';
+                        }
+                        
+                        // 应用淡入动画
+                        cell.style.transition = 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+                        cell.style.opacity = '1';
+                        cell.style.transform = 'scale(1)';
+                    }, 150);
+                }
+            });
+        }
     }
 }
 
 // 页面加载完成后初始化
-let streamManager;
+let streamManagers = {};
+
 window.addEventListener('DOMContentLoaded', () => {
-    streamManager = new StreamManager();
+    // 初始化标签页切换
+    setupTabs();
+    
+    // 初始化各个平台的StreamManager
+    streamManagers['douyin'] = new StreamManager('douyin');
+    streamManagers['bilibili'] = new StreamManager('bilibili');
     
     // 当打开插件面板时，自动刷新当前浏览器页面
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -903,12 +908,42 @@ window.addEventListener('DOMContentLoaded', () => {
             chrome.tabs.reload(tabs[0].id, {}, () => {
                 // 页面刷新后，重新提取直播流
                 setTimeout(() => {
-                    streamManager.setupLiveStreamExtraction();
+                    // 为当前活动标签页的平台提取数据
+                    const activePlatform = document.querySelector('.tab-btn.active').dataset.platform;
+                    streamManagers[activePlatform].setupLiveStreamExtraction();
                 }, 1000); // 1秒延迟，确保页面已加载
             });
         }
     });
 });
+
+// 标签页切换功能
+function setupTabs() {
+    const tabButtons = document.querySelectorAll('.tab-btn');
+    const tabContents = document.querySelectorAll('.tab-content');
+    
+    tabButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const platform = button.dataset.platform;
+            
+            // 移除所有活动状态
+            tabButtons.forEach(btn => btn.classList.remove('active'));
+            tabContents.forEach(content => content.classList.remove('active'));
+            
+            // 添加当前活动状态
+            button.classList.add('active');
+            document.getElementById(`${platform}Tab`).classList.add('active');
+            
+            // 初始化当前平台的数据
+            if (!streamManagers[platform]) {
+                streamManagers[platform] = new StreamManager(platform);
+            }
+            
+            // 刷新当前平台的数据
+            streamManagers[platform].setupLiveStreamExtraction();
+        });
+    });
+}
 
 // 显示通知
 function showNotification(message, type = "success") {
